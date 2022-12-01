@@ -1,4 +1,4 @@
-# webServer
+# COMP90015课程设计：webServer
 通过java实现一个简单的web服务器，其中涉及了单线程、多线程、线程池、远程调用方法、业务分割、页面缓存与置换，涵盖了java并发编程、计算机网络、操作系统等知识。
 
 # 项目框架
@@ -161,5 +161,68 @@ int i=(length - 1) & hash;
 第一种情况，如果该数组元素的头部节点为空，则创建一个HashPair来存储这个缓存，并将这个缓存节点设置为头节点。  
 第二种情况，如果当前位置的数组元素的头部节点不为空，即有缓存。如果缓存节点的长度小于规定的最大长度。我们要遍历一下这个链表判断这个页面是否已经被缓存了，如果是，则他的缓存次数加一，并将他放到链表尾部，便于后续的页面置换操作；如果没有这个页面缓存，则将它插入到链表尾部，并将链表长度加一。  
 第三种情况，如果当前位置的数组元素的头节点不为空，并且链表长度等于设定的阈值了，此时要进行页面替换，本实验中使用LRU算法进行页面替换，即直接把头节点替换成当前页面即可。
+
+
+
+## RemoteMethodInvocation
+实验六的主题是：如何迅捷地实现调用远程计算机上的服务，例如远程画板。在实验三与实验四中我们实现了超文本的并发传输，但是存在两个问题：
+1. 仅仅使用HTTP协议实现的超文本传输不稳定，可能有延迟，尤其在传输图画等对象时。
+2. 调用远程服务无法无视编程语言的不同，即无法满足分布式系统对于容忍异构性的要求。  
+
+
+
+因此我们寄希望于分布式系统的一个概念：Remote Procedure Call (RPC：远程过程调用）。该概念通过要求设备使用一致的传输协议和序列化协议，实现了远程服务的迅捷调用。RPC有很多实现的框架，由于课程要求只可以使用Java SE，因此采用了Java自带的RMI框架。  
+此外为了实现画板功能，Java GUI也被采用。该实验使用C/S架构、RPC概念与TCP/IP协议，实现了一款可以同时多人在线聊天画画的多人画板，其中管理员还可以允许用户加入、踢出用户、保存/载入画板以及强制关闭应用。RMI框架的具体应用实现步骤如下：
+1. 在Client和Server端分别定义两个**名字一样且必须继承Remote类**的接口。
+```
+    //定义接口
+    public interface BRemote extends Remote {
+        public Boolean remoteRequest(String name) throws RemoteException;
+    }
+```
+2. 定义一个继承UnicastRemoteObject并且实现上述接口的类并通过定义方法来实现服务。  
+```
+    //定义类
+    public class BRemoteCall extends UnicastRemoteObject implements BRemote{
+        public BRemoteCall() throws RemoteException {
+        }
+    
+        @Override
+        public Boolean remoteRequest(String name) throws RemoteException {
+            Boolean ans = false;
+            int option = JOptionPane.showConfirmDialog(null,"User: " +
+                    name + " want to join the white board", "New Request", JOptionPane.YES_NO_OPTION);
+            if(option == 0) {
+                if(CreateWhiteBoardMain.userMap.contains(name)) {
+                    ans = false;
+                    JOptionPane.showMessageDialog(null,"This user name is duplicated, the request is " +
+                            "automatically refused.");
+                } else {
+                    ans = true;
+                    CreateWhiteBoardMain.serialId++;
+                    CreateWhiteBoardMain.userMap.put(CreateWhiteBoardMain.serialId,name);
+                }
+            }
+            return ans;
+        }
+    }
+```
+3. 通过实例化对象以及调用其方法来调用服务。
+```
+    //调用服务
+    public static void rmiVerify(int rmiPort) {
+        try {
+            BRemoteCall bRemoteCall = new BRemoteCall();
+            Registry registry = LocateRegistry.createRegistry(rmiPort);
+            registry.rebind("get", bRemoteCall);
+        } catch (RemoteException e) {
+            System.out.println("Error: RMI port has been occupied or the server port has been occupied.");
+            System.exit(0);
+        }
+    }
+```
+
+
+
 
 
